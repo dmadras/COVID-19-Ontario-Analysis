@@ -1,7 +1,6 @@
 from datetime import datetime, date
 import numpy as np
 import os
-import gspread
 
 DATE = 'date'
 POSITIVE = 'positive'
@@ -21,21 +20,22 @@ CSSEGIS_RECOVERED_FILE = os.path.join(CSSEGIS_DIR, 'time_series_19-covid-Recover
 
 def load_ont_timeseries(fname):
     f = open(fname, 'r')
-    dat = f.readlines(f)
+    dat = f.readlines()
     
-    headers = dat[0]
+    headers = dat[0].strip().split(',')
     timeseries = {h: [] for h in headers}
 
     for i in range(1, len(dat)):
         line = dat[i].strip().split(',')
         for j in range(len(line)):
-            timeseries[headers[j]] = line[j]
+            timeseries[headers[j]].append(line[j])
 
     timeseries[DATE] = [datetime.strptime(d, '%m-%d-%Y') for d in timeseries['Date']]
     timeseries[POSITIVE] = [int(t) for t in timeseries['Confirmed Positive']]
-    timeseries[RESOLVED] = [int(t) for t in timeseries['Resolved']]
+    timeseries[RECOVERED] = [int(t) for t in timeseries['Resolved']]
     timeseries[DEATHS] = [int(t) for t in timeseries['Deaths']]
-    timeseries[TESTED] = [int(t) for t in timeseries['Total number of patients approved for COVID-19 testing to date']]
+    timeseries[TESTED] = [int(t) for t in 
+            timeseries['Total number of patients approved for COVID-19 testing to date']]
 
     return timeseries
 
@@ -54,7 +54,7 @@ def load_timeseries_from_cssegis(fname):
         line = dat[i].strip().split(',')
         region = (line[1] if len(line[0]) == 0 else '{}_{}'.format(
             line[0], line[1])).strip('"')
-        nums = line[4:]
+        nums = [int(d) for d in line[4:]]
         timeseries[region] = nums 
     return timeseries
     
@@ -67,12 +67,13 @@ def load_dates_from_cssegis(fname):
     return dates
 
 if __name__ == '__main__':
+    ont = load_ont_timeseries(ONT_FILE)
     confirmed_data = load_timeseries_from_cssegis(CSSEGIS_CONFIRMED_FILE)
     deaths_data = load_timeseries_from_cssegis(CSSEGIS_DEATHS_FILE)
     recovered_data = load_timeseries_from_cssegis(CSSEGIS_RECOVERED_FILE)
     dates = load_dates_from_cssegis(CSSEGIS_RECOVERED_FILE)
 
-    regions = ['Italy', 'Singapore', "Korea_South", 'Ontario_Canada']
+    regions = ['Italy', 'Singapore', 'France_France', "Korea_South", 'Ontario_Canada']
     fout = os.path.join(CSVDIR, 
             'covid_comparisons_{}.csv'.format(
                 date.today().strftime('%m-%d-%Y')))
@@ -84,6 +85,6 @@ if __name__ == '__main__':
                                 (deaths_data, DEATHS), 
                                 (recovered_data, RECOVERED)]:
             for region in regions:
-                region_data = [dataname, region] + data[region]
+                region_data = [dataname, region] + [str(d) for d in data[region]]
                 f.write(','.join(region_data) + '\n')
     print('Wrote to {}'.format(fout))
